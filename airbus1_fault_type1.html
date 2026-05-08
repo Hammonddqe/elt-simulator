@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>空客构型1 - 故障触发类型1</title>
+    <style>
+        * {
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0f111a;
+            font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .train-card {
+            max-width: 500px;
+            width: 100%;
+            background: #12141c;
+            border-radius: 48px;
+            padding: 24px 20px 32px;
+            box-shadow: 0 25px 40px rgba(0,0,0,0.5);
+        }
+
+        .nav-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 24px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #2a2e3c;
+        }
+
+        .title {
+            color: white;
+            font-weight: bold;
+            font-size: 1.25rem;
+        }
+
+        .title-suffix {
+            font-size: 0.9rem;
+            color: #8e92a2;
+        }
+
+        .back-btn {
+            display: none;
+        }
+
+        .panel-area {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            border-radius: 24px;
+            overflow: hidden;
+            margin-top: 16px;
+        }
+
+        .panel-image {
+            width: 100%;
+            display: block;
+            pointer-events: none;
+            position: relative;
+            z-index: 1;
+        }
+
+        .elt-light-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2;
+        }
+        .elt-light-overlay img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .hotspots {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+        }
+
+        .hotspot {
+            position: absolute;
+            cursor: pointer;
+            transition: all 0.1s;
+            border-radius: 8px;
+        }
+
+        .hotspot.hint {
+            border: 3px solid rgba(255, 200, 100, 0.9);
+            background: rgba(255, 200, 100, 0.25);
+            box-shadow: 0 0 8px rgba(255, 200, 100, 0.5);
+        }
+
+        .hotspot.disabled {
+            display: none;
+        }
+
+        .drag-switch {
+            position: absolute;
+            cursor: grab;
+            touch-action: none;
+            z-index: 20;
+            background: rgba(255, 255, 255, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            border-radius: 8px;
+            box-sizing: border-box;
+        }
+
+        .drag-switch:active {
+            cursor: grabbing;
+        }
+
+        .drag-switch.dragging {
+            opacity: 0.7;
+        }
+
+        .drag-switch.disabled {
+            display: none;
+        }
+
+        .feedback-card {
+            background: #1e1e2a;
+            border-radius: 24px;
+            padding: 16px 20px;
+            margin-top: 20px;
+            text-align: center;
+            min-height: 100px;
+        }
+
+        .step-badge {
+            display: inline-block;
+            background: #ffaa44;
+            color: #1e1e2a;
+            padding: 4px 14px;
+            border-radius: 40px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .feedback-text {
+            color: #e0e0e0;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+
+        .alarm-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #330000;
+            border: 1px solid #ff4444;
+            padding: 4px 12px;
+            border-radius: 40px;
+            margin-top: 10px;
+            font-size: 0.7rem;
+            color: #ff8888;
+        }
+
+        .reset-btn {
+            width: 100%;
+            background: #2a2a3a;
+            border: none;
+            padding: 12px;
+            border-radius: 40px;
+            color: white;
+            font-size: 0.9rem;
+            font-weight: bold;
+            margin-top: 16px;
+            cursor: pointer;
+        }
+
+        .start-btn {
+            width: 100%;
+            background: #ffaa44;
+            border: none;
+            padding: 14px;
+            border-radius: 40px;
+            color: #1a1c2a;
+            font-size: 1rem;
+            font-weight: bold;
+            margin-top: 16px;
+            cursor: pointer;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        html, body {
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+
+                /* 练习模式隐藏所有提示 */
+        .practice-mode .step-badge,
+        .practice-mode .feedback-text,
+        .practice-mode .title-suffix {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+<div class="train-card" id="appRoot"></div>
+
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const isPracticeMode = urlParams.get('mode') === 'practice';
+    
+    if (isPracticeMode) {
+        document.body.classList.add('practice-mode');
+    }
+    
+    function renderAirbus1FaultType1() {
+        const container = document.createElement('div');
+        container.innerHTML = `
+            <div class="nav-bar">
+                <div class="title">
+                    空客构型 1 <span class="title-suffix" id="titleSuffix">- 故障触发类型1</span>
+                </div>
+                <button class="back-btn" id="sceneBackBtn">◀ 返回</button>
+            </div>
+            <div class="panel-area" id="panelArea">
+                <img class="panel-image" id="panelImage" alt="ELT控制面板">
+                <div class="elt-light-overlay" id="lightOverlay">
+                    <img id="lightImg" alt="ELT灯" style="width:100%; height:100%; object-fit: contain;">
+                </div>
+                <div class="hotspots" id="hotspotsLayer"></div>
+            </div>
+            <div class="feedback-card">
+                <div class="step-badge" id="stepBadge">📋 提示</div>
+                <div class="feedback-text" id="feedbackText">🔊 请点击【开始练习】激活声音并开始训练</div>
+                <div class="alarm-badge" id="alarmBadge">🔴 警报发射中</div>
+            </div>
+            <button class="start-btn" id="startBtn">🔊 开始练习（激活声音）</button>
+            <button class="reset-btn hidden" id="sceneResetBtn">🔄 重置场景</button>
+        `;
+        
+        const panelImage = container.querySelector('#panelImage');
+        const hotspotsLayer = container.querySelector('#hotspotsLayer');
+        const panelArea = container.querySelector('#panelArea');
+        const stepBadge = container.querySelector('#stepBadge');
+        const feedbackText = container.querySelector('#feedbackText');
+        const alarmBadge = container.querySelector('#alarmBadge');
+        const startBtn = container.querySelector('#startBtn');
+        const resetBtn = container.querySelector('#sceneResetBtn');
+        const titleSuffix = container.querySelector('#titleSuffix');
+        const lightOverlay = container.querySelector('#lightOverlay');
+        const lightImg = container.querySelector('#lightImg');
+        
+        if (isPracticeMode && titleSuffix) {
+            titleSuffix.style.display = 'none';
+        }
+        
+        const PANEL_IMAGES = {
+            ON: "a1_panel_on.png",
+            ARM: "a1_panel_arm.png",
+            RESET: "a1_panel_reset.png"
+        };
+        
+        const LIGHT_IMAGE = "a1_light_on.png";
+        lightImg.src = LIGHT_IMAGE;
+        
+        let state = {
+            switchPos: "ARM",     // 初始在 ARM 位
+            eltActive: true,
+            resetComplete: false,
+            trainingActive: false,
+            lightBlinkTimer: null,
+            isResetting: false,
+            resetTimers: { step1: null, step2: null, step3: null, step4: null },
+            beepOscillator: null,
+            beepGain: null,
+            beepAudioCtx: null
+        };
+        
+        let onZone = null;
+        let armZone = null;
+        let resetZone = null;
+        let dragSwitch = null;
+        let isDragging = false;
+        let dragStartY = 0;
+        let dragStartTop = 0;
+        
+        let onRectInfo = null;
+        let armRectInfo = null;
+        let resetRectInfo = null;
+        
+        // 重新激活发射（拉到 ON 位时调用）
+        function reactivateElt() {
+            if (state.resetComplete) {
+                state.resetComplete = false;
+            }
+            if (!state.eltActive) {
+                state.eltActive = true;
+            }
+            // 如果已经在复位序列中，取消复位序列
+            if (state.isResetting) {
+                clearResetTimers();
+                state.isResetting = false;
+                stopBeep();
+            }
+            // 重新开始闪烁
+            stopLightBlink();
+            startLightBlink();
+            updateUI();
+        }
+        
+        function startBeep() {
+            try {
+                if (state.beepOscillator) {
+                    try { state.beepOscillator.stop(); } catch(e) {}
+                    state.beepOscillator = null;
+                }
+                if (state.beepAudioCtx) {
+                    state.beepAudioCtx.close();
+                }
+                
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                state.beepAudioCtx = new AudioCtx();
+                state.beepGain = state.beepAudioCtx.createGain();
+                state.beepGain.gain.value = 0.15;
+                state.beepGain.connect(state.beepAudioCtx.destination);
+                
+                state.beepOscillator = state.beepAudioCtx.createOscillator();
+                state.beepOscillator.type = "sine";
+                state.beepOscillator.frequency.value = 880;
+                state.beepOscillator.connect(state.beepGain);
+                state.beepOscillator.start();
+                state.beepAudioCtx.resume();
+            } catch(e) { console.log("蜂鸣音失败", e); }
+        }
+        
+        function stopBeep() {
+            try {
+                if (state.beepOscillator) {
+                    state.beepOscillator.stop();
+                    state.beepOscillator = null;
+                }
+                if (state.beepGain) {
+                    state.beepGain.disconnect();
+                    state.beepGain = null;
+                }
+                if (state.beepAudioCtx) {
+                    state.beepAudioCtx.close();
+                    state.beepAudioCtx = null;
+                }
+            } catch(e) {}
+        }
+        
+        function clearResetTimers() {
+            if (state.resetTimers.step1) { clearTimeout(state.resetTimers.step1); state.resetTimers.step1 = null; }
+            if (state.resetTimers.step2) { clearTimeout(state.resetTimers.step2); state.resetTimers.step2 = null; }
+            if (state.resetTimers.step3) { clearTimeout(state.resetTimers.step3); state.resetTimers.step3 = null; }
+            if (state.resetTimers.step4) { clearTimeout(state.resetTimers.step4); state.resetTimers.step4 = null; }
+        }
+        
+        function startResetSequence() {
+            if (state.isResetting) {
+                clearResetTimers();
+                state.isResetting = false;
+                stopBeep();
+            }
+            
+            state.isResetting = true;
+            stopLightBlink();
+            
+            lightOverlay.style.display = 'block';
+            lightOverlay.style.opacity = '1';
+            startBeep();
+            
+            state.resetTimers.step1 = setTimeout(() => {
+                if (!state.isResetting) return;
+                lightOverlay.style.opacity = '1';
+                startBeep();
+                
+                state.resetTimers.step2 = setTimeout(() => {
+                    if (!state.isResetting) return;
+                    lightOverlay.style.opacity = '0';
+                    stopBeep();
+                    
+                    state.resetTimers.step3 = setTimeout(() => {
+                        if (!state.isResetting) return;
+                        lightOverlay.style.opacity = '1';
+                        startBeep();
+                        
+                        state.resetTimers.step4 = setTimeout(() => {
+                            if (!state.isResetting) return;
+                            lightOverlay.style.opacity = '0';
+                            stopBeep();
+                            
+                            state.isResetting = false;
+                            state.resetComplete = true;
+                            state.eltActive = false;
+                            
+                            if (state.switchPos === "RESET") {
+                                state.switchPos = "ARM";
+                            }
+                            
+                            updateUI();
+                            playClickSound();
+                            
+                            if (isPracticeMode && window.parent !== window) {
+                                window.parent.postMessage({ type: 'resetComplete' }, '*');
+                            }
+                        }, 5000);
+                    }, 1000);
+                }, 500);
+            }, 0);
+        }
+        
+        function startLightBlink() {
+            stopLightBlink();
+            lightOverlay.style.display = 'block';
+            let isLightOn = true;
+            lightOverlay.style.opacity = '1';
+            startBeep();
+            
+            state.lightBlinkTimer = setInterval(() => {
+                if (state.resetComplete || state.isResetting || !state.eltActive || !state.trainingActive) {
+                    return;
+                }
+                isLightOn = !isLightOn;
+                lightOverlay.style.opacity = isLightOn ? '1' : '0';
+                if (isLightOn) {
+                    startBeep();
+                } else {
+                    stopBeep();
+                }
+            }, 500);
+        }
+        
+        function stopLightBlink() {
+            if (state.lightBlinkTimer) {
+                clearInterval(state.lightBlinkTimer);
+                state.lightBlinkTimer = null;
+            }
+            stopBeep();
+        }
+        
+        function updatePanelImage() {
+            if (!state.trainingActive) {
+                panelImage.src = PANEL_IMAGES.ARM;
+                return;
+            }
+            
+            if (state.resetComplete) {
+                panelImage.src = PANEL_IMAGES.ARM;
+                return;
+            }
+            
+            if (state.switchPos === "ON") {
+                panelImage.src = PANEL_IMAGES.ON;
+            } else if (state.switchPos === "ARM") {
+                panelImage.src = PANEL_IMAGES.ARM;
+            } else {
+                panelImage.src = PANEL_IMAGES.RESET;
+            }
+        }
+        
+        function updateFeedbackText() {
+            if (!state.trainingActive) {
+                feedbackText.innerHTML = "🔊 请点击【开始练习】激活声音并开始训练";
+                stepBadge.innerHTML = "📋 提示";
+                return;
+            }
+            
+            if (state.resetComplete) {
+                feedbackText.innerHTML = '✅ 复位完成！正常情况下约<span style="color: #ffaa44; font-weight: bold;">10秒</span>后ELT停止发射';
+                stepBadge.innerHTML = "✅ 复位完成";
+                return;
+            }
+            
+            if (state.isResetting) {
+                feedbackText.innerHTML = "⏳ ELT 正在复位中，请勿再次拨到 RESET 位！请等待灯熄灭...";
+                stepBadge.innerHTML = "📋 复位中";
+                return;
+            }
+            
+            if (state.switchPos === "ARM") {
+                feedbackText.innerHTML = "⬇️ 请将开关向下拖动到【RESET】位完成复位";
+                stepBadge.innerHTML = "📋 步骤 1/2";
+            } else if (state.switchPos === "RESET") {
+                feedbackText.innerHTML = "🔘 已到达 RESET 位，正在执行复位序列...";
+                stepBadge.innerHTML = "📋 步骤 2/2";
+            } else if (state.switchPos === "ON") {
+                feedbackText.innerHTML = "⚠️ 开关在 ON 位，请先拉回 ARM 位再进行复位";
+                stepBadge.innerHTML = "📋 操作提示";
+            }
+        }
+        
+        function updateUI() {
+            updatePanelImage();
+            updateFeedbackText();
+            
+            if (!state.trainingActive) {
+                alarmBadge.innerHTML = "⏸ 等待开始";
+                alarmBadge.style.background = "#2a2a3a";
+                alarmBadge.style.borderColor = "#888";
+                alarmBadge.style.color = "#888";
+                updateHotspotVisibility();
+                return;
+            }
+            
+            if (state.resetComplete) {
+                alarmBadge.innerHTML = "✅ 警报已解除";
+                alarmBadge.style.background = "#004d1a";
+                alarmBadge.style.borderColor = "#00cc66";
+                alarmBadge.style.color = "#88ffaa";
+                updateHotspotVisibility();
+                return;
+            }
+            
+            if (state.eltActive && !state.resetComplete && !state.isResetting) {
+                alarmBadge.innerHTML = "🔴 警报发射中";
+                alarmBadge.style.background = "#330000";
+                alarmBadge.style.borderColor = "#ff4444";
+                alarmBadge.style.color = "#ff8888";
+            } else if (!state.isResetting) {
+                alarmBadge.innerHTML = "✅ 警报已解除";
+                alarmBadge.style.background = "#004d1a";
+                alarmBadge.style.borderColor = "#00cc66";
+                alarmBadge.style.color = "#88ffaa";
+            }
+            
+            updateHotspotVisibility();
+        }
+        
+        function startTraining() {
+            state.trainingActive = true;
+            startBtn.classList.add('hidden');
+            resetBtn.classList.remove('hidden');
+            
+            startLightBlink();
+            updateUI();
+        }
+        
+        function playClickSound() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = "sine";
+                osc.frequency.value = 800;
+                gain.gain.value = 0.1;
+                osc.start();
+                gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.2);
+                osc.stop(ctx.currentTime + 0.2);
+                ctx.resume();
+            } catch(e) {}
+        }
+        
+        function updateHotspotVisibility() {
+            if (!onZone || !armZone || !resetZone) return;
+            
+            if (!state.trainingActive || state.resetComplete) {
+                onZone.classList.add('disabled');
+                armZone.classList.add('disabled');
+                resetZone.classList.add('disabled');
+                if (dragSwitch) dragSwitch.classList.add('disabled');
+                return;
+            }
+            
+            onZone.classList.remove('disabled');
+            armZone.classList.remove('disabled');
+            resetZone.classList.remove('disabled');
+            if (dragSwitch) dragSwitch.classList.remove('disabled');
+        }
+        
+        function updateHotspotHints() {
+            if (!onZone || !armZone || !resetZone) return;
+            onZone.classList.remove('hint');
+            armZone.classList.remove('hint');
+            resetZone.classList.remove('hint');
+            
+            if (!state.trainingActive || state.resetComplete) return;
+            
+            // 根据当前开关位置，提示下一个要拖到的位置
+            if (state.switchPos === "ARM") {
+                resetZone.classList.add('hint');
+            } else if (state.switchPos === "ON") {
+                armZone.classList.add('hint');
+            } else {
+                onZone.classList.add('hint');
+                armZone.classList.add('hint');
+                resetZone.classList.add('hint');
+            }
+        }
+        
+        function getHotzoneRects() {
+            if (onZone && armZone && resetZone) {
+                onRectInfo = onZone.getBoundingClientRect();
+                armRectInfo = armZone.getBoundingClientRect();
+                resetRectInfo = resetZone.getBoundingClientRect();
+            }
+        }
+        
+        function createDragSwitch() {
+            if (dragSwitch) dragSwitch.remove();
+            
+            dragSwitch = document.createElement('div');
+            dragSwitch.className = 'drag-switch disabled';
+            panelArea.appendChild(dragSwitch);
+            
+            function updateSwitchPosition() {
+                if (!onZone || !armZone || !resetZone) return;
+                let targetRect;
+                if (state.switchPos === "ON") {
+                    targetRect = onZone.getBoundingClientRect();
+                } else if (state.switchPos === "ARM") {
+                    targetRect = armZone.getBoundingClientRect();
+                } else {
+                    targetRect = resetZone.getBoundingClientRect();
+                }
+                const panelRect = panelArea.getBoundingClientRect();
+                dragSwitch.style.left = (targetRect.left - panelRect.left) + 'px';
+                dragSwitch.style.top = (targetRect.top - panelRect.top) + 'px';
+                dragSwitch.style.width = targetRect.width + 'px';
+                dragSwitch.style.height = targetRect.height + 'px';
+            }
+            
+            let startY = 0;
+            let startTop = 0;
+            
+            function onDragStart(e) {
+                if (!state.trainingActive || state.resetComplete) return;
+                e.preventDefault();
+                isDragging = true;
+                dragSwitch.classList.add('dragging');
+                
+                const touch = e.touches ? e.touches[0] : e;
+                startY = touch.clientY;
+                
+                const top = parseFloat(dragSwitch.style.top);
+                startTop = isNaN(top) ? 0 : top;
+            }
+            
+            function onDragMove(e) {
+                if (!isDragging) return;
+                e.preventDefault();
+                const touch = e.touches ? e.touches[0] : e;
+                const deltaY = touch.clientY - startY;
+                
+                let newTop = startTop + deltaY;
+                const panelRect = panelArea.getBoundingClientRect();
+                const switchRect = dragSwitch.getBoundingClientRect();
+                newTop = Math.max(0, Math.min(newTop, panelRect.height - switchRect.height));
+                dragSwitch.style.top = newTop + 'px';
+                
+                getHotzoneRects();
+                if (!onRectInfo || !armRectInfo || !resetRectInfo) return;
+                
+                const currentRect = dragSwitch.getBoundingClientRect();
+                const centerY = (currentRect.top + currentRect.bottom) / 2;
+                
+                const isInOnZone = centerY >= onRectInfo.top && centerY <= onRectInfo.bottom;
+                const isInArmZone = centerY >= armRectInfo.top && centerY <= armRectInfo.bottom;
+                const isInResetZone = centerY >= resetRectInfo.top && centerY <= resetRectInfo.bottom;
+                
+                let newPos = state.switchPos;
+                if (isInOnZone) newPos = "ON";
+                else if (isInArmZone) newPos = "ARM";
+                else if (isInResetZone) newPos = "RESET";
+                
+                if (newPos !== state.switchPos) {
+                    const oldPos = state.switchPos;
+                    state.switchPos = newPos;
+                    updatePanelImage();
+                    updateFeedbackText();
+                    playClickSound();
+                    
+                    // 如果拉到 ON 位，重新激活发射（保持 ON 位不回弹）
+                    if (newPos === "ON") {
+                        reactivateElt();
+                    }
+                    
+                    // 如果拉到 RESET 位且未完成复位，开始复位序列
+                    if (newPos === "RESET" && !state.resetComplete && !state.isResetting) {
+                        startResetSequence();
+                        updateUI();
+                    }
+                }
+            }
+            
+            function onDragEnd(e) {
+                if (!isDragging) {
+                    updateSwitchPosition();
+                    return;
+                }
+                e.preventDefault();
+                isDragging = false;
+                dragSwitch.classList.remove('dragging');
+                
+                // 故障触发类型1：只有 RESET 位松手才弹回 ARM，ON 位保持不回弹
+                if (!state.resetComplete) {
+                    if (state.switchPos === "RESET") {
+                        state.switchPos = "ARM";
+                        updatePanelImage();
+                        updateFeedbackText();
+                        playClickSound();
+                    }
+                    // ON 位保持，不做任何操作
+                }
+                
+                updateSwitchPosition();
+                updateUI();
+            }
+            
+            dragSwitch.addEventListener('touchstart', onDragStart, { passive: false });
+            dragSwitch.addEventListener('touchmove', onDragMove, { passive: false });
+            dragSwitch.addEventListener('touchend', onDragEnd);
+            dragSwitch.addEventListener('mousedown', onDragStart);
+            window.addEventListener('mousemove', onDragMove);
+            window.addEventListener('mouseup', onDragEnd);
+            
+            return { updateSwitchPosition };
+        }
+        
+        let switchUpdater = null;
+        
+        function setupHotspots() {
+            hotspotsLayer.innerHTML = "";
+            
+            onZone = document.createElement('div');
+            onZone.className = 'hotspot disabled';
+            onZone.style.left = '29%';
+            onZone.style.top = '24%';
+            onZone.style.width = '15%';
+            onZone.style.height = '12%';
+            hotspotsLayer.appendChild(onZone);
+            
+            armZone = document.createElement('div');
+            armZone.className = 'hotspot disabled';
+            armZone.style.left = '29%';
+            armZone.style.top = '41%';
+            armZone.style.width = '15%';
+            armZone.style.height = '12%';
+            hotspotsLayer.appendChild(armZone);
+            
+            resetZone = document.createElement('div');
+            resetZone.className = 'hotspot disabled';
+            resetZone.style.left = '29%';
+            resetZone.style.top = '60%';
+            resetZone.style.width = '15%';
+            resetZone.style.height = '12%';
+            hotspotsLayer.appendChild(resetZone);
+            
+            const { updateSwitchPosition } = createDragSwitch();
+            switchUpdater = { updateSwitchPosition };
+            
+            updateHotspotVisibility();
+            updateHotspotHints();
+        }
+        
+        function resetScenario() {
+            stopLightBlink();
+            clearResetTimers();
+            stopBeep();
+            
+            state = {
+                switchPos: "ARM",
+                eltActive: true,
+                resetComplete: false,
+                trainingActive: true,
+                lightBlinkTimer: null,
+                isResetting: false,
+                resetTimers: { step1: null, step2: null, step3: null, step4: null },
+                beepOscillator: null,
+                beepGain: null,
+                beepAudioCtx: null
+            };
+            
+            lightOverlay.style.display = 'block';
+            startLightBlink();
+            updateUI();
+            if (switchUpdater) setTimeout(() => switchUpdater.updateSwitchPosition(), 50);
+            playClickSound();
+        }
+        
+        setupHotspots();
+        updateUI();
+        
+        startBtn.onclick = () => {
+            startTraining();
+            setTimeout(() => {
+                if (switchUpdater) switchUpdater.updateSwitchPosition();
+            }, 100);
+        };
+        
+        resetBtn.onclick = () => {
+            resetScenario();
+        };
+        
+        return container;
+    }
+    
+    const root = document.getElementById('appRoot');
+    root.innerHTML = '';
+    root.appendChild(renderAirbus1FaultType1());
+</script>
+</body>
+</html>

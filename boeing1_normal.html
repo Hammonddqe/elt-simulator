@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>ELT仿真训练 - 波音构型1 误触发</title>
+    <style>
+        * {
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0c12;
+            font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .app-container {
+            max-width: 500px;
+            width: 100%;
+            background: #12141c;
+            border-radius: 48px;
+            padding: 24px 20px 32px;
+            box-shadow: 0 25px 40px rgba(0,0,0,0.5);
+        }
+
+        .nav-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 24px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #2a2e3c;
+        }
+
+        .title {
+            color: white;
+            font-weight: bold;
+            font-size: 1.25rem;
+        }
+
+        .back-btn {
+            background: #2a2e3c;
+            border: none;
+            color: white;
+            padding: 6px 16px;
+            border-radius: 40px;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+
+        .panel-area {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            border-radius: 24px;
+            overflow: hidden;
+            margin-top: 16px;
+        }
+
+        .panel-image {
+            width: 100%;
+            display: block;
+            pointer-events: none;
+        }
+
+        .hotspots {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .hotspot {
+            position: absolute;
+            cursor: pointer;
+            transition: all 0.1s;
+            border-radius: 8px;
+        }
+
+        .hotspot.hint {
+            border: 2px dashed rgba(255, 255, 255, 0.7);
+            background: transparent;
+        }
+
+        .hotspot.disabled {
+            display: none;
+        }
+
+        .feedback-card {
+            background: #1e1e2a;
+            border-radius: 24px;
+            padding: 16px 20px;
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .step-badge {
+            display: inline-block;
+            background: #ffaa44;
+            color: #1e1e2a;
+            padding: 4px 14px;
+            border-radius: 40px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .feedback-text {
+            color: #e0e0e0;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+
+        .alarm-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #330000;
+            border: 1px solid #ff4444;
+            padding: 4px 12px;
+            border-radius: 40px;
+            margin-top: 10px;
+            font-size: 0.7rem;
+            color: #ff8888;
+        }
+
+        .reset-btn {
+            width: 100%;
+            background: #2a2a3a;
+            border: none;
+            padding: 12px;
+            border-radius: 40px;
+            color: white;
+            font-size: 0.9rem;
+            font-weight: bold;
+            margin-top: 16px;
+            cursor: pointer;
+        }
+
+        .start-btn {
+            width: 100%;
+            background: #ffaa44;
+            border: none;
+            padding: 14px;
+            border-radius: 40px;
+            color: #1a1c2a;
+            font-size: 1rem;
+            font-weight: bold;
+            margin-top: 16px;
+            cursor: pointer;
+        }
+
+        .elt-guide-btn {
+            width: 100%;
+            background: #3a3a55;
+            border: none;
+            padding: 12px;
+            border-radius: 40px;
+            color: #ffaa44;
+            font-size: 0.9rem;
+            font-weight: bold;
+            margin-top: 12px;
+            cursor: pointer;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            max-width: 400px;
+            width: 90%;
+            background: #1a1c2a;
+            border-radius: 48px;
+            padding: 24px;
+            box-shadow: 0 25px 40px rgba(0,0,0,0.5);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #3a3e52;
+        }
+
+        .modal-title {
+            color: white;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        .modal-close {
+            background: #2a2e3c;
+            border: none;
+            color: white;
+            padding: 6px 16px;
+            border-radius: 40px;
+            cursor: pointer;
+        }
+
+        .elt-panel-area {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            border-radius: 24px;
+            overflow: hidden;
+        }
+
+        .elt-panel-image {
+            width: 100%;
+            display: block;
+            pointer-events: none;
+        }
+
+        .elt-info {
+            background: #0f111a;
+            border-radius: 20px;
+            padding: 12px;
+            margin-top: 16px;
+            text-align: center;
+        }
+
+        .elt-info-text {
+            color: #b9c2d9;
+            font-size: 0.85rem;
+        }
+
+        .tx-led {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+
+        .tx-led.on {
+            background: #ff3333;
+            box-shadow: 0 0 8px #ff0000;
+        }
+
+        .tx-led.off {
+            background: #330000;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        /* 练习模式隐藏所有提示 */
+        .practice-mode .step-badge,
+        .practice-mode .feedback-text,
+        .practice-mode .alert-tip,
+        .practice-mode .title-suffix {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+<div class="app-container" id="appRoot"></div>
+
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const isPracticeMode = urlParams.get('mode') === 'practice';
+    
+    if (isPracticeMode) {
+        document.body.classList.add('practice-mode');
+    }
+
+    function renderBoeing1Normal() {
+        const container = document.createElement('div');
+        container.innerHTML = `
+            <div class="nav-bar">
+                <div class="title">波音构型 1 - 误触发</div>
+                <button class="back-btn" id="sceneBackBtn">◀ 返回</button>
+            </div>
+            <div class="panel-area">
+                <img class="panel-image" id="panelImage" alt="ELT控制面板">
+                <div class="hotspots" id="hotspotsLayer"></div>
+            </div>
+            <div class="feedback-card">
+                <div class="step-badge" id="stepBadge">📋 误触发</div>
+                <div class="feedback-text" id="feedbackText">🚨 开关在ON位，ELT异常发射，请打开保护盖</div>
+                <div class="alarm-badge" id="alarmBadge">🔴 警报发射中</div>
+            </div>
+            <button class="start-btn" id="startBtn">🔊 开始练习（激活声音）</button>
+            <button class="reset-btn hidden" id="sceneResetBtn">🔄 重置场景</button>
+            <button class="elt-guide-btn hidden" id="eltGuideBtn">🔧 ELT 本体指引</button>
+        `;
+        
+        const panelImage = container.querySelector('#panelImage');
+        const hotspotsLayer = container.querySelector('#hotspotsLayer');
+        const stepBadge = container.querySelector('#stepBadge');
+        const feedbackText = container.querySelector('#feedbackText');
+        const alarmBadge = container.querySelector('#alarmBadge');
+        const startBtn = container.querySelector('#startBtn');
+        const resetBtn = container.querySelector('#sceneResetBtn');
+        const backBtn = container.querySelector('#sceneBackBtn');
+        const eltGuideBtn = container.querySelector('#eltGuideBtn');
+        
+        const IMAGES = {
+            STATE1: "b1coveroff-elton.png",
+            STATE2: "b1coveron-elton-on.png",
+            STATE3: "b1coveron-eltoff-arm.png",
+            STATE4: "b1coveroff-eltoff-arm.png"
+        };
+        
+        const ELT_IMAGES = {
+            TX_ON: "elt_off_tx_on.png",
+            TX_OFF: "elt_off_tx_off.png"
+        };
+        
+        let state = {
+            coverOpen: false,
+            switchPos: "ON",
+            eltActive: true,
+            resetComplete: false,
+            trainingActive: false
+        };
+        
+        let alarmAudio = null;
+        let isAudioActivated = false;
+        let coverZone = null;
+        let armZone = null;
+        let onZone = null;
+        let isModalOpen = false;
+        
+        function initAlarmAudio() {
+            if (!alarmAudio) {
+                alarmAudio = new Audio("alarm.MP3");
+                alarmAudio.loop = true;
+                alarmAudio.volume = 0.5;
+            }
+        }
+        
+        function activateAudio() {
+            if (isAudioActivated) return;
+            isAudioActivated = true;
+            initAlarmAudio();
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                ctx.resume().then(() => ctx.close());
+            } catch(e) {}
+        }
+        
+        function startTraining() {
+            activateAudio();
+            state.trainingActive = true;
+            startBtn.classList.add('hidden');
+            resetBtn.classList.remove('hidden');
+            eltGuideBtn.classList.remove('hidden');
+            
+            if (alarmAudio) {
+                alarmAudio.currentTime = 0;
+                alarmAudio.play().catch(e => console.log("播放失败", e));
+            }
+            
+            updateUI();
+        }
+        
+        function updateAlarmSound() {
+            if (!isAudioActivated || !state.trainingActive) return;
+            initAlarmAudio();
+            const shouldPlay = !state.resetComplete && state.eltActive;
+            if (shouldPlay) {
+                if (alarmAudio.paused) {
+                    alarmAudio.play().catch(e => console.log("播放失败", e));
+                }
+            } else {
+                if (!alarmAudio.paused) {
+                    alarmAudio.pause();
+                    alarmAudio.currentTime = 0;
+                }
+            }
+        }
+        
+        function playClickSound() {
+            if (!isAudioActivated) return;
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = "sine";
+                osc.frequency.value = 800;
+                gain.gain.value = 0.1;
+                osc.start();
+                gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.2);
+                osc.stop(ctx.currentTime + 0.2);
+                ctx.resume();
+            } catch(e) {}
+        }
+        
+        function updateHotspotVisibility() {
+            if (!coverZone || !armZone || !onZone) return;
+            
+            if (!state.trainingActive || state.resetComplete) {
+                coverZone.classList.add('disabled');
+                armZone.classList.add('disabled');
+                onZone.classList.add('disabled');
+                return;
+            }
+            
+            coverZone.classList.remove('disabled');
+            
+            // 只有保护盖打开且 ELT 还在发射状态时，才显示开关热区
+            if (state.coverOpen && !state.resetComplete && state.eltActive) {
+                armZone.classList.remove('disabled');
+                onZone.classList.remove('disabled');
+            } else {
+                armZone.classList.add('disabled');
+                onZone.classList.add('disabled');
+            }
+        }
+        
+        function updateHotspotHints() {
+            if (!coverZone || !armZone || !onZone) return;
+            coverZone.classList.remove('hint');
+            armZone.classList.remove('hint');
+            onZone.classList.remove('hint');
+            
+            if (!state.trainingActive || state.resetComplete) return;
+            
+            if (!state.coverOpen) {
+                coverZone.classList.add('hint');
+            } else if (state.eltActive) {
+                // 保护盖打开且还在发射状态，提示开关热区
+                if (state.switchPos === "ON") {
+                    armZone.classList.add('hint');
+                } else {
+                    onZone.classList.add('hint');
+                }
+            }
+        }
+        
+        function updateUI() {
+            if (!state.trainingActive) {
+                panelImage.src = IMAGES.STATE1;
+                stepBadge.innerHTML = "📋 误触发";
+                feedbackText.innerHTML = "🔊 请点击【开始练习】激活声音并开始训练";
+                alarmBadge.innerHTML = "⏸ 等待开始";
+                alarmBadge.style.background = "#2a2a3a";
+                alarmBadge.style.borderColor = "#888";
+                alarmBadge.style.color = "#888";
+                updateHotspotVisibility();
+                updateHotspotHints();
+                return;
+            }
+            
+            if (state.resetComplete) {
+                panelImage.src = IMAGES.STATE4;
+                stepBadge.innerHTML = "✅ 复位完成";
+                feedbackText.innerHTML = "🎉 ELT 已成功停止发射！操作正确。";
+                alarmBadge.innerHTML = "✅ 警报已解除";
+                alarmBadge.style.background = "#004d1a";
+                alarmBadge.style.borderColor = "#00cc66";
+                alarmBadge.style.color = "#88ffaa";
+                updateAlarmSound();
+                updateHotspotVisibility();
+                updateHotspotHints();
+                return;
+            }
+            
+            if (!state.coverOpen) {
+                panelImage.src = IMAGES.STATE1;
+                stepBadge.innerHTML = "📋 步骤 1/3";
+                feedbackText.innerHTML = "🔒 请点击【保护盖】将其打开";
+            } else {
+                if (state.switchPos === "ON") {
+                    panelImage.src = IMAGES.STATE2;
+                    stepBadge.innerHTML = "📋 步骤 2/3";
+                    feedbackText.innerHTML = "🔧 请将开关拨到【ARMED】位";
+                } else {
+                    panelImage.src = IMAGES.STATE3;
+                    stepBadge.innerHTML = "📋 步骤 3/3";
+                    feedbackText.innerHTML = "🔒 请关闭保护盖完成复位";
+                }
+            }
+            
+            if (state.eltActive) {
+                alarmBadge.innerHTML = "🔴 警报发射中";
+                alarmBadge.style.background = "#330000";
+                alarmBadge.style.borderColor = "#ff4444";
+                alarmBadge.style.color = "#ff8888";
+            } else {
+                alarmBadge.innerHTML = "✅ 警报已解除";
+                alarmBadge.style.background = "#004d1a";
+                alarmBadge.style.borderColor = "#00cc66";
+                alarmBadge.style.color = "#88ffaa";
+            }
+            
+            updateAlarmSound();
+            updateHotspotVisibility();
+            updateHotspotHints();
+        }
+        
+        function completeReset() {
+            if (state.resetComplete) return;
+            state.resetComplete = true;
+            updateUI();
+            playClickSound();
+        }
+        
+        function resetScenario() {
+            state = {
+                coverOpen: false,
+                switchPos: "ON",
+                eltActive: true,
+                resetComplete: false,
+                trainingActive: true
+            };
+            updateUI();
+            playClickSound();
+            if (alarmAudio) {
+                alarmAudio.currentTime = 0;
+                alarmAudio.play().catch(e => console.log("播放失败", e));
+            }
+        }
+        
+        function openEltModal() {
+            if (isModalOpen || !state.trainingActive) return;
+            isModalOpen = true;
+            playClickSound();
+            
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div class="modal-title">🔧 ELT 本体面板</div>
+                        <button class="modal-close" id="modalCloseBtn">关闭</button>
+                    </div>
+                    <div class="elt-panel-area">
+                        <img class="elt-panel-image" id="eltPanelImage" alt="ELT本体面板">
+                    </div>
+                    <div class="elt-info">
+                        <div class="elt-info-text">
+                            <span class="tx-led" id="txLed"></span>
+                            TX 指示灯状态：<span id="txStatus">发射中</span>
+                        </div>
+                        <div class="elt-info-text" style="margin-top: 8px; color: #888;">
+                            ※ 开关位置：OFF（固定，不可操作）
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            const eltImage = modal.querySelector('#eltPanelImage');
+            const txLed = modal.querySelector('#txLed');
+            const txStatus = modal.querySelector('#txStatus');
+            const modalCloseBtn = modal.querySelector('#modalCloseBtn');
+            
+            function updateEltModalUI() {
+                const isTxOn = !state.resetComplete && state.eltActive;
+                if (isTxOn) {
+                    eltImage.src = ELT_IMAGES.TX_ON;
+                    txLed.className = 'tx-led on';
+                    txStatus.innerText = '发射中';
+                } else {
+                    eltImage.src = ELT_IMAGES.TX_OFF;
+                    txLed.className = 'tx-led off';
+                    txStatus.innerText = '已停止';
+                }
+            }
+            
+            updateEltModalUI();
+            
+            const intervalId = setInterval(() => {
+                if (!isModalOpen) {
+                    clearInterval(intervalId);
+                    return;
+                }
+                updateEltModalUI();
+            }, 100);
+            
+            modalCloseBtn.onclick = () => {
+                clearInterval(intervalId);
+                modal.remove();
+                isModalOpen = false;
+                playClickSound();
+            };
+            
+            modal.onclick = (e) => {
+                if (e.target === modal) {
+                    clearInterval(intervalId);
+                    modal.remove();
+                    isModalOpen = false;
+                }
+            };
+        }
+        
+        function setupHotspots() {
+            hotspotsLayer.innerHTML = "";
+            
+            coverZone = document.createElement('div');
+            coverZone.className = 'hotspot disabled';
+            coverZone.style.left = '66%';
+            coverZone.style.top = '22%';
+            coverZone.style.width = '19%';
+            coverZone.style.height = '55%';
+            coverZone.onclick = () => {
+                if (!state.trainingActive) return;
+                playClickSound();
+                if (state.resetComplete) {
+                    feedbackText.innerHTML = "⚠️ 训练已完成，请按【重置场景】重新练习";
+                    return;
+                }
+                if (!state.coverOpen) {
+                    state.coverOpen = true;
+                    updateUI();
+                } else {
+                    if (state.switchPos === "ARM" && !state.eltActive) {
+                        state.coverOpen = false;
+                        completeReset();
+                    } else {
+                        feedbackText.innerHTML = "请先将开关拨到 ARM 位";
+                    }
+                }
+            };
+            hotspotsLayer.appendChild(coverZone);
+            
+            armZone = document.createElement('div');
+            armZone.className = 'hotspot disabled';
+            armZone.style.left = '70%';
+            armZone.style.top = '23%';
+            armZone.style.width = '12%';
+            armZone.style.height = '10%';
+            armZone.onclick = () => {
+                if (!state.trainingActive || !state.coverOpen) return;
+                playClickSound();
+                if (state.resetComplete) return;
+                if (state.switchPos === "ON") {
+                    state.switchPos = "ARM";
+                    state.eltActive = false;
+                    updateUI();
+                    playClickSound();
+                } else {
+                    feedbackText.innerHTML = "开关已在 ARM 位，请关闭保护盖";
+                }
+            };
+            hotspotsLayer.appendChild(armZone);
+            
+            onZone = document.createElement('div');
+            onZone.className = 'hotspot disabled';
+            onZone.style.left = '70%';
+            onZone.style.top = '50%';
+            onZone.style.width = '11%';
+            onZone.style.height = '9%';
+            onZone.onclick = () => {
+                if (!state.trainingActive || !state.coverOpen) return;
+                playClickSound();
+                if (state.resetComplete) return;
+                if (state.switchPos === "ARM") {
+                    state.switchPos = "ON";
+                    updateUI();
+                    playClickSound();
+                } else {
+                    feedbackText.innerHTML = "开关已在 ON 位，请拨回 ARM";
+                }
+            };
+            hotspotsLayer.appendChild(onZone);
+            
+            updateHotspotVisibility();
+            updateHotspotHints();
+        }
+        
+        setupHotspots();
+        updateUI();
+        
+        startBtn.onclick = () => {
+            startTraining();
+        };
+        
+        resetBtn.onclick = () => {
+            resetScenario();
+        };
+        
+        backBtn.onclick = () => {
+            if (alarmAudio) {
+                alarmAudio.pause();
+                alarmAudio.currentTime = 0;
+            }
+            const event = new CustomEvent('sceneBack');
+            container.dispatchEvent(event);
+        };
+        
+        eltGuideBtn.onclick = () => {
+            if (state.trainingActive) {
+                openEltModal();
+            }
+        };
+        
+        return container;
+    }
+    
+    const root = document.getElementById('appRoot');
+    root.innerHTML = '';
+    root.appendChild(renderBoeing1Normal());
+    
+    root.addEventListener('sceneBack', () => {
+        alert("返回菜单功能需要在完整项目中集成");
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>波音构型2 - 误触发</title>
+    <style>
+        * {
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0f111a;
+            font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .train-card {
+            max-width: 500px;
+            width: 100%;
+            background: #12141c;
+            border-radius: 48px;
+            padding: 24px 20px 32px;
+            box-shadow: 0 25px 40px rgba(0,0,0,0.5);
+        }
+
+        .nav-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 24px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #2a2e3c;
+        }
+
+        .title {
+            color: white;
+            font-weight: bold;
+            font-size: 1.25rem;
+        }
+
+        .title-suffix {
+            font-size: 0.9rem;
+            color: #8e92a2;
+        }
+
+        .back-btn {
+            display: none;
+        }
+
+        .alert-tip {
+            background: #8B0000;
+            color: #FFCC00;
+            text-align: center;
+            padding: 10px 12px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            border: 1px solid #FF6600;
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; background: #8B0000; }
+            50% { opacity: 0.85; background: #AA0000; }
+        }
+
+        .alert-tip.hidden {
+            display: none;
+        }
+
+        .panel-area {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            border-radius: 24px;
+            overflow: hidden;
+            margin-top: 16px;
+        }
+
+        .panel-image {
+            width: 100%;
+            display: block;
+            pointer-events: none;
+        }
+
+        .hotspots {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .hotspot {
+            position: absolute;
+            cursor: pointer;
+            transition: all 0.1s;
+            border-radius: 8px;
+        }
+
+        .hotspot.hint {
+            border: 2px dashed rgba(255, 255, 255, 0.7);
+            background: transparent;
+        }
+
+        .hotspot.disabled {
+            display: none;
+        }
+
+        .drag-switch {
+            position: absolute;
+            cursor: grab;
+            touch-action: none;
+            z-index: 20;
+            background: rgba(255, 255, 255, 0.4);
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            border-radius: 8px;
+            box-sizing: border-box;
+        }
+
+        .drag-switch:active {
+            cursor: grabbing;
+        }
+
+        .drag-switch.dragging {
+            opacity: 0.7;
+        }
+
+        .drag-switch.disabled {
+            display: none;
+        }
+
+        .feedback-card {
+            background: #1e1e2a;
+            border-radius: 24px;
+            padding: 16px 20px;
+            margin-top: 20px;
+            text-align: center;
+            min-height: 100px;
+        }
+
+        .step-badge {
+            display: inline-block;
+            background: #ffaa44;
+            color: #1e1e2a;
+            padding: 4px 14px;
+            border-radius: 40px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .feedback-text {
+            color: #e0e0e0;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+
+        .alarm-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #330000;
+            border: 1px solid #ff4444;
+            padding: 4px 12px;
+            border-radius: 40px;
+            margin-top: 10px;
+            font-size: 0.7rem;
+            color: #ff8888;
+        }
+
+        .reset-btn {
+            width: 100%;
+            background: #2a2a3a;
+            border: none;
+            padding: 12px;
+            border-radius: 40px;
+            color: white;
+            font-size: 0.9rem;
+            font-weight: bold;
+            margin-top: 16px;
+            cursor: pointer;
+        }
+
+        .start-btn {
+            width: 100%;
+            background: #ffaa44;
+            border: none;
+            padding: 14px;
+            border-radius: 40px;
+            color: #1a1c2a;
+            font-size: 1rem;
+            font-weight: bold;
+            margin-top: 16px;
+            cursor: pointer;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        html, body {
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+
+        /* 练习模式隐藏所有提示 */
+        .practice-mode .step-badge,
+        .practice-mode .feedback-text,
+        .practice-mode .alert-tip,
+        .practice-mode .title-suffix {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+<div class="train-card" id="appRoot"></div>
+
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const isPracticeMode = urlParams.get('mode') === 'practice';
+    
+    if (isPracticeMode) {
+        document.body.classList.add('practice-mode');
+    }
+    
+    function renderBoeing2Normal() {
+        const container = document.createElement('div');
+        container.innerHTML = `
+            <div class="nav-bar">
+                <div class="title">
+                    波音构型 2 <span class="title-suffix" id="titleSuffix">- 误触发</span>
+                </div>
+                <button class="back-btn" id="sceneBackBtn">◀ 返回</button>
+            </div>
+            <div class="alert-tip hidden" id="alertTip">
+                ⚠️ ELT警报声在前轮舱播放且在驾驶舱不易察觉！ ⚠️
+            </div>
+            <div class="panel-area" id="panelArea">
+                <img class="panel-image" id="panelImage" alt="ELT控制面板">
+                <div class="hotspots" id="hotspotsLayer"></div>
+            </div>
+            <div class="feedback-card">
+                <div class="step-badge" id="stepBadge">📋 提示</div>
+                <div class="feedback-text" id="feedbackText">🔊 请点击【开始练习】激活声音并开始训练</div>
+                <div class="alarm-badge" id="alarmBadge">🔴 警报发射中</div>
+            </div>
+            <button class="start-btn" id="startBtn">🔊 开始练习（激活声音）</button>
+            <button class="reset-btn hidden" id="sceneResetBtn">🔄 重置场景</button>
+        `;
+        
+        const panelImage = container.querySelector('#panelImage');
+        const hotspotsLayer = container.querySelector('#hotspotsLayer');
+        const panelArea = container.querySelector('#panelArea');
+        const stepBadge = container.querySelector('#stepBadge');
+        const feedbackText = container.querySelector('#feedbackText');
+        const alarmBadge = container.querySelector('#alarmBadge');
+        const startBtn = container.querySelector('#startBtn');
+        const resetBtn = container.querySelector('#sceneResetBtn');
+        const alertTip = container.querySelector('#alertTip');
+        const titleSuffix = container.querySelector('#titleSuffix');
+        
+        if (isPracticeMode && titleSuffix) {
+            titleSuffix.style.display = 'none';
+        }
+        
+        const IMAGES = {
+            COVER_CLOSED_ON: "b2_cover_closed_on.png",
+            COVER_CLOSED_OFF: "b2_cover_closed_off.png",
+            COVER_OPEN_ON: "b2_cover_open_on.png",
+            COVER_OPEN_ARM_ON: "b2_cover_open_arm_on.png",
+            COVER_OPEN_ARM_OFF: "b2_cover_open_arm_off.png",
+            COVER_OPEN_RESET_ON: "b2_cover_open_reset_on.png",
+            COVER_OPEN_RESET_OFF: "b2_cover_open_reset_off.png"
+        };
+        
+        let state = {
+            coverOpen: false,
+            switchPos: "ON",
+            eltActive: true,
+            resetComplete: false,
+            trainingActive: false,
+            resetTimer: null,
+            resetEnterTime: 0,
+            hasResetSucceeded: false
+        };
+        
+        let alarmAudio = null;
+        let coverZone = null;
+        let armZone = null;
+        let onZone = null;
+        let resetZone = null;
+        let dragSwitch = null;
+        let isDragging = false;
+        let dragStartY = 0;
+        let dragStartTop = 0;
+        
+        let armRectInfo = null;
+        let onRectInfo = null;
+        let resetRectInfo = null;
+        
+        function updateAlertTip() {
+            const shouldShow = state.trainingActive && !state.resetComplete && state.eltActive;
+            if (shouldShow) {
+                alertTip.classList.remove('hidden');
+            } else {
+                alertTip.classList.add('hidden');
+            }
+        }
+        
+        function initAlarmAudio() {
+            if (!alarmAudio) {
+                alarmAudio = new Audio("alarm.MP3");
+                alarmAudio.loop = true;
+                alarmAudio.volume = 0.5;
+            }
+        }
+        
+        function startTraining() {
+            initAlarmAudio();
+            state.trainingActive = true;
+            startBtn.classList.add('hidden');
+            resetBtn.classList.remove('hidden');
+            
+            alarmAudio.currentTime = 0;
+            alarmAudio.play().catch(e => console.log("播放失败", e));
+            
+            updateUI();
+            updateAlertTip();
+        }
+        
+        function updateAlarmSound() {
+            if (!state.trainingActive) return;
+            if (!alarmAudio) return;
+            const shouldPlay = !state.resetComplete && state.eltActive;
+            if (shouldPlay) {
+                if (alarmAudio.paused) {
+                    alarmAudio.play().catch(e => console.log("播放失败", e));
+                }
+            } else {
+                if (!alarmAudio.paused) {
+                    alarmAudio.pause();
+                    alarmAudio.currentTime = 0;
+                }
+            }
+        }
+        
+        function playClickSound() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = "sine";
+                osc.frequency.value = 800;
+                gain.gain.value = 0.1;
+                osc.start();
+                gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.2);
+                osc.stop(ctx.currentTime + 0.2);
+                ctx.resume();
+            } catch(e) {}
+        }
+        
+        function startResetTimer() {
+            if (state.resetTimer) clearInterval(state.resetTimer);
+            state.resetEnterTime = Date.now();
+            
+            state.resetTimer = setInterval(() => {
+                if (!state.hasResetSucceeded && state.switchPos === "RESET") {
+                    const elapsed = Date.now() - state.resetEnterTime;
+                    if (elapsed >= 3000 && !state.resetComplete && !state.hasResetSucceeded) {
+                        clearInterval(state.resetTimer);
+                        state.resetTimer = null;
+                        state.eltActive = true;
+                        state.hasResetSucceeded = false;
+                        updateUI();
+                        playClickSound();
+                    }
+                }
+            }, 100);
+        }
+        
+        function cancelResetTimer() {
+            if (state.resetTimer) {
+                clearInterval(state.resetTimer);
+                state.resetTimer = null;
+            }
+        }
+        
+        function performReset() {
+            if (state.hasResetSucceeded) return;
+            
+            cancelResetTimer();
+            state.hasResetSucceeded = true;
+            state.eltActive = false;
+            
+            updateUI();
+            playClickSound();
+            
+            if (isPracticeMode && window.parent !== window) {
+                window.parent.postMessage({ type: 'resetComplete' }, '*');
+            }
+        }
+        
+        function updatePanelImage() {
+            if (!state.trainingActive) {
+                panelImage.src = IMAGES.COVER_CLOSED_ON;
+                return;
+            }
+            
+            if (state.resetComplete) {
+                if (!state.coverOpen) {
+                    panelImage.src = IMAGES.COVER_CLOSED_OFF;
+                } else {
+                    panelImage.src = IMAGES.COVER_OPEN_ARM_OFF;
+                }
+                return;
+            }
+            
+            if (!state.coverOpen) {
+                if (state.eltActive) {
+                    panelImage.src = IMAGES.COVER_CLOSED_ON;
+                } else {
+                    panelImage.src = IMAGES.COVER_CLOSED_OFF;
+                }
+            } else {
+                if (state.switchPos === "ON") {
+                    panelImage.src = IMAGES.COVER_OPEN_ON;
+                } else if (state.switchPos === "RESET") {
+                    if (state.eltActive && !state.hasResetSucceeded) {
+                        panelImage.src = IMAGES.COVER_OPEN_RESET_ON;
+                    } else {
+                        panelImage.src = IMAGES.COVER_OPEN_RESET_OFF;
+                    }
+                } else {
+                    if (state.eltActive && !state.hasResetSucceeded) {
+                        panelImage.src = IMAGES.COVER_OPEN_ARM_ON;
+                    } else {
+                        panelImage.src = IMAGES.COVER_OPEN_ARM_OFF;
+                    }
+                }
+            }
+        }
+        
+        function updateFeedbackText() {
+            if (!state.trainingActive) {
+                feedbackText.innerHTML = "🔊 请点击【开始练习】激活声音并开始训练";
+                stepBadge.innerHTML = "📋 提示";
+                return;
+            }
+            
+            if (state.resetComplete) {
+                feedbackText.innerHTML = '✅ 复位完成！为确保正确复位，请确保在 RESET 位停留时间<span style="color: #ff6666; font-weight: bold;">不超过 3 秒</span>';
+                stepBadge.innerHTML = "✅ 训练完成";
+                return;
+            }
+            
+            if (!state.coverOpen) {
+                feedbackText.innerHTML = "🔒 请点击【保护盖】将其打开";
+                stepBadge.innerHTML = "📋 步骤 1/3";
+                return;
+            }
+            
+            if (state.hasResetSucceeded) {
+                feedbackText.innerHTML = "✅ 复位成功！ELT 已停止发射，请关闭保护盖";
+                stepBadge.innerHTML = "✅ 复位成功";
+                return;
+            }
+            
+            if (state.switchPos === "ON") {
+                feedbackText.innerHTML = "⬆️ 请将开关向上拖动到【ARM】位，再向上到【RESET】位";
+                stepBadge.innerHTML = "📋 步骤 2/3";
+            } else if (state.switchPos === "ARM") {
+                feedbackText.innerHTML = "⬆️ 请继续向上拖动到【RESET】位完成复位";
+                stepBadge.innerHTML = "📋 步骤 2/3";
+            } else if (state.switchPos === "RESET") {
+                const elapsed = state.resetEnterTime ? Date.now() - state.resetEnterTime : 0;
+                if (elapsed < 3000) {
+                    feedbackText.innerHTML = "✅ ELT 已复位！请松手或拖回 ARM 位，然后关闭保护盖";
+                } else {
+                    feedbackText.innerHTML = "⚠️ 已超过3秒，请重新操作";
+                }
+                stepBadge.innerHTML = "📋 步骤 3/3";
+            }
+        }
+        
+        function updateUI() {
+            updatePanelImage();
+            updateFeedbackText();
+            
+            if (!state.trainingActive) {
+                alarmBadge.innerHTML = "⏸ 等待开始";
+                alarmBadge.style.background = "#2a2a3a";
+                alarmBadge.style.borderColor = "#888";
+                alarmBadge.style.color = "#888";
+                updateHotspotVisibility();
+                updateAlertTip();
+                return;
+            }
+            
+            if (state.resetComplete) {
+                alarmBadge.innerHTML = "✅ 警报已解除";
+                alarmBadge.style.background = "#004d1a";
+                alarmBadge.style.borderColor = "#00cc66";
+                alarmBadge.style.color = "#88ffaa";
+                updateAlarmSound();
+                updateHotspotVisibility();
+                updateAlertTip();
+                return;
+            }
+            
+            if (state.eltActive) {
+                alarmBadge.innerHTML = "🔴 警报发射中";
+                alarmBadge.style.background = "#330000";
+                alarmBadge.style.borderColor = "#ff4444";
+                alarmBadge.style.color = "#ff8888";
+            } else {
+                alarmBadge.innerHTML = "✅ 警报已解除";
+                alarmBadge.style.background = "#004d1a";
+                alarmBadge.style.borderColor = "#00cc66";
+                alarmBadge.style.color = "#88ffaa";
+            }
+            
+            updateAlarmSound();
+            updateHotspotVisibility();
+            updateAlertTip();
+        }
+        
+        function updateHotspotVisibility() {
+            if (!coverZone || !armZone || !onZone || !resetZone) return;
+            
+            if (!state.trainingActive || state.resetComplete) {
+                coverZone.classList.add('disabled');
+                armZone.classList.add('disabled');
+                onZone.classList.add('disabled');
+                resetZone.classList.add('disabled');
+                if (dragSwitch) dragSwitch.classList.add('disabled');
+                return;
+            }
+            
+            coverZone.classList.remove('disabled');
+            
+            if (state.coverOpen && !state.resetComplete) {
+                armZone.classList.remove('disabled');
+                onZone.classList.remove('disabled');
+                resetZone.classList.remove('disabled');
+                if (dragSwitch) dragSwitch.classList.remove('disabled');
+            } else {
+                armZone.classList.add('disabled');
+                onZone.classList.add('disabled');
+                resetZone.classList.add('disabled');
+                if (dragSwitch) dragSwitch.classList.add('disabled');
+            }
+        }
+        
+        function updateHotspotHints() {
+            if (!coverZone || !armZone || !onZone || !resetZone) return;
+            coverZone.classList.remove('hint');
+            armZone.classList.remove('hint');
+            onZone.classList.remove('hint');
+            resetZone.classList.remove('hint');
+            
+            if (!state.trainingActive || state.resetComplete) return;
+            
+            if (!state.coverOpen) {
+                coverZone.classList.add('hint');
+            } else if (!state.hasResetSucceeded && !state.resetComplete) {
+                if (state.switchPos === "ON") {
+                    armZone.classList.add('hint');
+                } else if (state.switchPos === "ARM") {
+                    resetZone.classList.add('hint');
+                }
+            }
+        }
+        
+        function getHotzoneRects() {
+            if (armZone && onZone && resetZone) {
+                armRectInfo = armZone.getBoundingClientRect();
+                onRectInfo = onZone.getBoundingClientRect();
+                resetRectInfo = resetZone.getBoundingClientRect();
+            }
+        }
+        
+        function createDragSwitch() {
+            if (dragSwitch) dragSwitch.remove();
+            
+            dragSwitch = document.createElement('div');
+            dragSwitch.className = 'drag-switch disabled';
+            panelArea.appendChild(dragSwitch);
+            
+            function updateSwitchPosition() {
+                if (!armZone || !onZone || !resetZone) return;
+                let targetRect;
+                if (state.switchPos === "ARM") {
+                    targetRect = armZone.getBoundingClientRect();
+                } else if (state.switchPos === "ON") {
+                    targetRect = onZone.getBoundingClientRect();
+                } else {
+                    targetRect = resetZone.getBoundingClientRect();
+                }
+                const panelRect = panelArea.getBoundingClientRect();
+                dragSwitch.style.left = (targetRect.left - panelRect.left) + 'px';
+                dragSwitch.style.top = (targetRect.top - panelRect.top) + 'px';
+                dragSwitch.style.width = targetRect.width + 'px';
+                dragSwitch.style.height = targetRect.height + 'px';
+            }
+            
+            let startY = 0;
+            let startTop = 0;
+            
+            function onDragStart(e) {
+                if (!state.trainingActive || state.resetComplete) return;
+                if (!state.coverOpen) return;
+                e.preventDefault();
+                isDragging = true;
+                dragSwitch.classList.add('dragging');
+                
+                const touch = e.touches ? e.touches[0] : e;
+                startY = touch.clientY;
+                
+                const top = parseFloat(dragSwitch.style.top);
+                startTop = isNaN(top) ? 0 : top;
+            }
+            
+            function onDragMove(e) {
+                if (!isDragging) return;
+                e.preventDefault();
+                const touch = e.touches ? e.touches[0] : e;
+                const deltaY = touch.clientY - startY;
+                
+                let newTop = startTop + deltaY;
+                const panelRect = panelArea.getBoundingClientRect();
+                const switchRect = dragSwitch.getBoundingClientRect();
+                newTop = Math.max(0, Math.min(newTop, panelRect.height - switchRect.height));
+                dragSwitch.style.top = newTop + 'px';
+                
+                getHotzoneRects();
+                if (!armRectInfo || !onRectInfo || !resetRectInfo) return;
+                
+                const currentRect = dragSwitch.getBoundingClientRect();
+                const centerY = (currentRect.top + currentRect.bottom) / 2;
+                
+                const isInOnZone = centerY >= onRectInfo.top && centerY <= onRectInfo.bottom;
+                const isInArmZone = centerY >= armRectInfo.top && centerY <= armRectInfo.bottom;
+                const isInResetZone = centerY >= resetRectInfo.top && centerY <= resetRectInfo.bottom;
+                
+                let newPos = state.switchPos;
+                if (isInResetZone) newPos = "RESET";
+                else if (isInArmZone) newPos = "ARM";
+                else if (isInOnZone) newPos = "ON";
+                
+                if (newPos !== state.switchPos) {
+                    const previousPos = state.switchPos;
+                    state.switchPos = newPos;
+                    
+                    if (newPos === "RESET" && !state.hasResetSucceeded && !state.resetComplete) {
+                        startResetTimer();
+                        performReset();
+                    }
+                    if (previousPos === "RESET" && newPos !== "RESET") {
+                        cancelResetTimer();
+                    }
+                    
+                    updatePanelImage();
+                    updateFeedbackText();
+                    playClickSound();
+                }
+            }
+            
+            function onDragEnd(e) {
+                if (!isDragging) {
+                    updateSwitchPosition();
+                    return;
+                }
+                e.preventDefault();
+                isDragging = false;
+                dragSwitch.classList.remove('dragging');
+                
+                if (!state.resetComplete && state.switchPos !== "ARM") {
+                    state.switchPos = "ARM";
+                    cancelResetTimer();
+                    updatePanelImage();
+                    updateFeedbackText();
+                    playClickSound();
+                }
+                
+                updateSwitchPosition();
+                updateUI();
+            }
+            
+            dragSwitch.addEventListener('touchstart', onDragStart, { passive: false });
+            dragSwitch.addEventListener('touchmove', onDragMove, { passive: false });
+            dragSwitch.addEventListener('touchend', onDragEnd);
+            dragSwitch.addEventListener('mousedown', onDragStart);
+            window.addEventListener('mousemove', onDragMove);
+            window.addEventListener('mouseup', onDragEnd);
+            
+            return { updateSwitchPosition };
+        }
+        
+        let switchUpdater = null;
+        
+        function setupHotspots() {
+            hotspotsLayer.innerHTML = "";
+            
+            coverZone = document.createElement('div');
+            coverZone.className = 'hotspot disabled';
+            coverZone.style.left = '66%';
+            coverZone.style.top = '22%';
+            coverZone.style.width = '19%';
+            coverZone.style.height = '55%';
+            coverZone.onclick = () => {
+                if (!state.trainingActive) return;
+                playClickSound();
+                if (state.resetComplete) return;
+                
+                if (!state.coverOpen) {
+                    state.coverOpen = true;
+                    updateUI();
+                    setTimeout(() => {
+                        if (switchUpdater) switchUpdater.updateSwitchPosition();
+                    }, 50);
+                } else {
+                    if (state.hasResetSucceeded) {
+                        state.coverOpen = false;
+                        state.resetComplete = true;
+                        updateUI();
+                    } else {
+                        feedbackText.innerHTML = "请先完成复位操作再关闭保护盖";
+                        setTimeout(() => updateFeedbackText(), 1500);
+                    }
+                }
+            };
+            hotspotsLayer.appendChild(coverZone);
+            
+            armZone = document.createElement('div');
+            armZone.className = 'hotspot disabled';
+            armZone.style.left = '70%';
+            armZone.style.top = '35%';
+            armZone.style.width = '12%';
+            armZone.style.height = '10%';
+            hotspotsLayer.appendChild(armZone);
+            
+            onZone = document.createElement('div');
+            onZone.className = 'hotspot disabled';
+            onZone.style.left = '70%';
+            onZone.style.top = '55%';
+            onZone.style.width = '11%';
+            onZone.style.height = '9%';
+            hotspotsLayer.appendChild(onZone);
+            
+            resetZone = document.createElement('div');
+            resetZone.className = 'hotspot disabled';
+            resetZone.style.left = '70%';
+            resetZone.style.top = '20%';
+            resetZone.style.width = '12%';
+            resetZone.style.height = '10%';
+            hotspotsLayer.appendChild(resetZone);
+            
+            const { updateSwitchPosition } = createDragSwitch();
+            switchUpdater = { updateSwitchPosition };
+            
+            updateHotspotVisibility();
+            updateHotspotHints();
+        }
+        
+        function resetScenario() {
+            cancelResetTimer();
+            state = {
+                coverOpen: false,
+                switchPos: "ON",
+                eltActive: true,
+                resetComplete: false,
+                trainingActive: true,
+                resetTimer: null,
+                resetEnterTime: 0,
+                hasResetSucceeded: false
+            };
+            updateUI();
+            if (switchUpdater) setTimeout(() => switchUpdater.updateSwitchPosition(), 50);
+            playClickSound();
+            if (alarmAudio) {
+                alarmAudio.currentTime = 0;
+                alarmAudio.play().catch(e => console.log("播放失败", e));
+            }
+            updateAlertTip();
+        }
+        
+        setupHotspots();
+        updateUI();
+        
+        startBtn.onclick = () => {
+            startTraining();
+            setTimeout(() => {
+                if (switchUpdater) switchUpdater.updateSwitchPosition();
+            }, 100);
+        };
+        
+        resetBtn.onclick = () => {
+            resetScenario();
+        };
+        
+        return container;
+    }
+    
+    const root = document.getElementById('appRoot');
+    root.innerHTML = '';
+    root.appendChild(renderBoeing2Normal());
+</script>
+</body>
+</html>
